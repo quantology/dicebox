@@ -73,15 +73,12 @@ array([17, 17])
 
 
 **todo:**
- - [ ] better batching
  - [ ] pdist (incl composability)
- - [ ] thresholding
  - [ ] roll logging
- - [ ] right-operations (e.g. `2 * d(6)`)
- - [ ] better expr collapse
+ - [ ] better expr collapse (sympy?)
+ - [ ] better DiceExpr str rendering
  - [ ] DiceExpr.parse
  - [ ] visual output (w/ scavegr)
- - [ ] DnD numeric output (& batching)
 
 ---
 
