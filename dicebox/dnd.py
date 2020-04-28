@@ -1,5 +1,8 @@
 from functools import partial
 
+import numpy as np
+import pandas as pd
+
 from .core import Dice, DiceExpr
 
 def critical_roll(initial_roll):
@@ -29,42 +32,43 @@ def _format_attack_roll_result(to_hit, to_hit_roll, critical_miss, critical_hit,
     return result
 
 def attack_roll(to_hit_bonus, weapon_damage, adv=False, disadv=False, name=None,
-                criticals=True, critical_hits=None, critical_misses=None, numeric=False, n=None):
-    # todo -- batching for n?
-    if n is not None:
-        return [attack_roll(to_hit_bonus, weapon_damage, adv, disadv, name,
-                               criticals, critical_hits, critical_misses, numeric)
-                  for i in range(n)]
+                criticals=True, critical_hits=None, critical_misses=None, numeric=False, repeat=None):
+    n = 1 if repeat is None else repeat
     d20 = Dice(20)
     if adv:
         d20 = d20.adv
     if disadv:
         d20 = d20.disadv
-
-    to_hit_base = d20()
     critical_misses = criticals if critical_misses is None else critical_misses
     critical_hits = criticals if critical_hits is None else critical_hits
-    if to_hit_base == 1 and critical_misses:
-        to_hit_roll = to_hit_base
-        weapon_damage_roll = float('nan')
-    else:
-        to_hit_roll = to_hit_base + to_hit_bonus
-        if to_hit_base == 20 and critical_hits:
-            weapon_damage = critical_roll(weapon_damage)
-        else:
-            to_hit = d20 + to_hit_bonus
-            to_hit_text = f"{to_hit_roll} to hit {to_hit};"
-        weapon_damage_roll = weapon_damage()
-    result = {
-            "to_hit_roll": to_hit_roll,
-            "to_hit": str(d20 + to_hit_bonus),
-            "critical_miss": critical_misses and to_hit_base == 1,
-            "critical_hit": critical_hits and to_hit_base == 20,
-            "weapon_damage": str(weapon_damage),
-            "weapon_damage_roll": weapon_damage_roll
-    }
+
+    to_hit_base = d20(n)
+    critical_miss = (to_hit_base == 1) & critical_misses
+    critical_hit = (to_hit_base == 20) & critical_hits
+    normal_roll = ~critical_miss & ~critical_hit
+    to_hit_roll = to_hit_base + to_hit_bonus
+    weapon_damage_roll = np.zeros(n, dtype=int)
+    if normal_roll.any():
+        weapon_damage_roll[normal_roll] = weapon_damage(normal_roll.sum())
+    if critical_hit.any():
+        critical_damage = critical_roll(weapon_damage)
+        weapon_damage_roll[critical_hit] = critical_damage(critical_hit.sum())
+    result = pd.DataFrame({
+        "critical_miss": critical_miss,
+        "critical_hit": critical_hit,
+        "to_hit": str(d20 + to_hit_bonus),
+        "to_hit_roll": to_hit_roll,
+        "weapon_damage_roll": weapon_damage_roll,
+        "weapon_damage": str(weapon_damage)
+    })
+    result.loc[result["critical_miss"], "weapon_damage"] = "0"
+    if critical_hit.any():
+        result.loc[result["critical_hit"], "weapon_damage"] = str(critical_damage)
     if not numeric:
-        result = _format_attack_roll_result(**result, name=name)
+        result = [_format_attack_roll_result(**row.to_dict(), name=name)
+                  for _, row in result.iterrows()]
+    if repeat is None:
+        result = result[0]
     return result
 
 def attack_roll_factory(weapon_name, weapon_damage, to_hit_bonus, **kwargs):

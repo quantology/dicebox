@@ -129,6 +129,7 @@ class Dice(DiceExpr):
         if repeat is None:
             return result[0]
         return result
+    __call__ = roll
 
     @property
     def adv(self):
@@ -149,6 +150,5 @@ class Dice(DiceExpr):
         return f"{agg}({result})"
     def __repr__(self):
         return f"<Dice{self}>"
-    __call__ = roll
 
 d = Dice
