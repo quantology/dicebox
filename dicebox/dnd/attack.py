@@ -1,9 +1,8 @@
 from functools import partial
 
 import numpy as np
-import pandas as pd
 
-from .core import Dice, DiceExpr
+from ..core import Dice, DiceExpr
 
 def critical_roll(initial_roll):
     if initial_roll is None:
@@ -33,6 +32,7 @@ def _format_attack_roll_result(to_hit, to_hit_roll, critical_miss, critical_hit,
 
 def attack_roll(to_hit_bonus, weapon_damage, adv=False, disadv=False, name=None,
                 criticals=True, critical_hits=None, critical_misses=None, numeric=False, repeat=None):
+    import pandas as pd
     n = 1 if repeat is None else repeat
     d20 = Dice(20)
     if adv:

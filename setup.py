@@ -31,12 +31,16 @@ with open("README.md", "r") as fp:
     long_description = fp.read()
 
 setup(name="dicebox",
-      version="0.2.0",
+      version="0.4.0",
       author="Michael Tartre",
       author_email="michael@enkratic.com",
       url="https://github.com/quantology/dicebox",
       packages=["dicebox"],
       install_requires=["numpy"],
+      extras_require={
+        "parse":  ["asteval"],
+        "dndsim": ["pandas"],
+      },
       description="A simple python DSL for dice.",
       long_description=long_description,
       long_description_content_type='text/markdown',

@@ -2,6 +2,7 @@ from collections.abc import Iterable, Mapping
 from collections import Counter
 from functools import partialmethod, partial
 import operator
+import re
 
 import numpy as np
 
@@ -84,18 +85,33 @@ class DiceExpr:
     def __str__(self):
         opstr = OP_STRS[self.op]
         left = str(self.left)
-        if getattr(self.left, "op", None) == "add" and getattr(self.left, "agg", "sum") == "sum" and self.op == "add":
-            left = left.strip("()")
+        if hasattr(self.left, "op") and not ("add" == self.left.op == self.op):
+            left = f"({left})"
+        elif len(getattr(self.left, "dice_sides", [])) > 1 and self.op != "add":
+            left = f"({left})"
         if self.right is None:
-            return f"({opstr} {left})"
+            return f"{opstr} {left}"
         right = str(self.right)
-        if getattr(self.right, "op", None) == "add" and getattr(self.right, "agg", "sum") == "sum" and self.op == "add":
-            right = right.strip("()")
-        return f"({left} {opstr} {right})"
+        if hasattr(self.right, "op") and not ("right" == self.right.op == self.op):
+            right = f"({right})"
+        elif len(getattr(self.right, "dice_sides", [])) > 1 and self.op != "add":
+            right = f"({right})"
+        return f"{left} {opstr} {right}"
     def __repr__(self):
-        return f"<DiceExpr{self}>"
+        return f"<DiceExpr({self})>"
+
+fnmatch = re.compile(r"^(?P<fn>(adv)|(disadv))\((?P<args>[^)]+)\)$")
 
 class Dice(DiceExpr):
+    @classmethod
+    def parse(cls, s):
+        for term in s.split("+"):
+            term = term.strip()
+            m = fnmatch.match(term)
+            if m:
+                agg = m.group("fn")
+                contents
+
     def __init__(self, sides=6, *other_sides, agg="sum"):
         if not isinstance(sides, Iterable):
             sides = (sides,)
@@ -106,7 +122,6 @@ class Dice(DiceExpr):
         self.dice_sides = sides
         assert agg in {"sum", "adv", "disadv"}
         self.agg = agg
-        self.op = "add"
 
     def roll(self, repeat=None, *, seed=None):
         n = 1 if repeat is None else repeat
@@ -146,9 +161,31 @@ class Dice(DiceExpr):
         collect = [f"{n_dice}d{n_sides}" for n_sides, n_dice
                    in self.dice_sides.items()]
         result = " + ".join(collect)
-        agg = "" if self.agg == "sum" else self.agg
-        return f"{agg}({result})"
+        if self.agg != "sum":
+            result = f"{self.agg}({result})"
+        return result
     def __repr__(self):
-        return f"<Dice{self}>"
+        return f"<Dice({self})>"
 
 d = Dice
+
+# parsing
+
+def parse_dice_term(s):
+    n, sides = s.split("d")
+    return Dice({int(sides): int(n)})
+
+def with_adv(d):
+    return d.adv
+def with_disadv(d):
+    return d.disadv
+
+_symtable = {"dice": parse_dice_term, "adv": with_adv, "disadv": with_disadv}
+_dice_match = re.compile(r"\b([0-9]+d[0-9]+)\b")
+
+def parse(s):
+    import asteval
+    eval_friendly = _dice_match.sub(r"dice('\1')", s)
+    return asteval.Interpreter(
+        symtable=_symtable, minimal=True, use_numpy=False, builtins_readonly=True
+    ).eval(eval_friendly)
